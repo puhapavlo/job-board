@@ -20,6 +20,7 @@ class RegistrationController extends AbstractController
       $decoded = json_decode($request->getContent());
       $email = $decoded->email;
       $plaintextPassword = $decoded->password;
+      $role = $decoded->role;
 
       $user = new User();
       $hashedPassword = $passwordHasher->hashPassword(
@@ -28,9 +29,10 @@ class RegistrationController extends AbstractController
       );
       $user->setPassword($hashedPassword);
       $user->setEmail($email);
+      $user->setRoles([$role]);
       $em->persist($user);
       $em->flush();
 
-      return $this->json(['message' => 'Registered Successfully']);
+      return $this->json(['message' => 'Registered Successfully'], Response::HTTP_CREATED);
     }
 }
