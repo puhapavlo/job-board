@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use Lexik\Bundle\JWTAuthenticationBundle\Encoder\JWTEncoderInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\Routing\Annotation\Route;
@@ -21,7 +22,7 @@ class ProfileController extends AbstractController
     }
 
     #[Route('/profile', name: 'app_profile', methods: ['GET'])]
-    public function index(): Response
+    public function index(Request $request): Response
     {
       $token = $this->tokenStorage->getToken();
 
@@ -31,6 +32,12 @@ class ProfileController extends AbstractController
 
       $user = $token->getUser();
 
-      return $this->json(['email' => $user->getEmail()], Response::HTTP_OK);
+      return $this->json(
+      [
+          'id' => $user->getId(),
+          'email' => $user->getEmail(),
+          'roles' => $user->getRoles(),
+          'picture' => $user->getPicture() ? $request->getSchemeAndHttpHost() . $user->getPicture()->getPath() : null,
+      ], Response::HTTP_OK);
     }
 }

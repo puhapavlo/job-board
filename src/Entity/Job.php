@@ -2,7 +2,14 @@
 
 namespace App\Entity;
 
+use ApiPlatform\Doctrine\Odm\Filter\SearchFilter;
+use ApiPlatform\Metadata\ApiFilter;
+use ApiPlatform\Metadata\ApiResource;
+use ApiPlatform\Metadata\Get;
+use ApiPlatform\Metadata\GetCollection;
 use App\Repository\JobRepository;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
@@ -36,8 +43,22 @@ class Job
     #[ORM\Column(length: 255)]
     private ?string $category = null;
 
-    #[ORM\ManyToOne(inversedBy: 'jobs')]
-    private ?Resume $resume = null;
+    #[ORM\Column(length: 255)]
+    private ?string $location = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?float $salary = null;
+
+    #[ORM\Column(length: 255)]
+    private ?string $Company = null;
+
+    #[ORM\ManyToMany(targetEntity: Resume::class, mappedBy: 'jobs')]
+    private Collection $resumes;
+
+    public function __construct()
+    {
+        $this->resumes = new ArrayCollection();
+    }
 
     public function getId(): ?int
     {
@@ -128,14 +149,65 @@ class Job
         return $this;
     }
 
-    public function getResume(): ?Resume
+    public function getLocation(): ?string
     {
-        return $this->resume;
+        return $this->location;
     }
 
-    public function setResume(?Resume $resume): self
+    public function setLocation(string $location): self
     {
-        $this->resume = $resume;
+        $this->location = $location;
+
+        return $this;
+    }
+
+    public function getSalary(): ?float
+    {
+        return $this->salary;
+    }
+
+    public function setSalary(?float $salary): self
+    {
+        $this->salary = $salary;
+
+        return $this;
+    }
+
+    public function getCompany(): ?string
+    {
+        return $this->Company;
+    }
+
+    public function setCompany(string $Company): self
+    {
+        $this->Company = $Company;
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, Resume>
+     */
+    public function getResumes(): Collection
+    {
+        return $this->resumes;
+    }
+
+    public function addResume(Resume $resume): self
+    {
+        if (!$this->resumes->contains($resume)) {
+            $this->resumes->add($resume);
+            $resume->addJob($this);
+        }
+
+        return $this;
+    }
+
+    public function removeResume(Resume $resume): self
+    {
+        if ($this->resumes->removeElement($resume)) {
+            $resume->removeJob($this);
+        }
 
         return $this;
     }
@@ -150,6 +222,19 @@ class Job
             'category' => $this->getCategory(),
             'requirements' => $this->getRequirements(),
             'published' => $this->getPublishedAt(),
+            'salary' => $this->getSalary(),
+            'location' => $this->getLocation(),
+            'company' => $this->getCompany(),
         ];
+    }
+
+    public function toArrayWithResumes() {
+        $job_array = $this->toArray();
+        $resumes = $this->getResumes();
+        $job_array['resume'] = [];
+        foreach ($resumes as $resume) {
+            $job_array['resume'][] = $resume->toArray();
+        }
+        return $job_array;
     }
 }

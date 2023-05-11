@@ -2,15 +2,16 @@
 
 namespace App\Entity;
 
+use ApiPlatform\Metadata\ApiResource;
 use App\Repository\UserRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
-use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
 
 #[ORM\Entity(repositoryClass: UserRepository::class)]
+#[ApiResource]
 class User implements UserInterface, PasswordAuthenticatedUserInterface
 {
 
@@ -36,6 +37,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     #[ORM\OneToOne(mappedBy: 'author', cascade: ['persist', 'remove'])]
     private ?Resume $resume = null;
+
+    #[ORM\OneToOne(cascade: ['persist', 'remove'])]
+    private ?File $picture = null;
 
     public function __construct()
     {
@@ -157,5 +161,25 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $this->resume = $resume;
 
         return $this;
+    }
+
+    public function getPicture(): ?File
+    {
+        return $this->picture;
+    }
+
+    public function setPicture(?File $picture): self
+    {
+        $this->picture = $picture;
+
+        return $this;
+    }
+
+    public function toArray() {
+        return [
+            'id' => $this->getId(),
+            'email' => $this->getEmail(),
+            'picture' => $this->getPicture()?->getPath()
+        ];
     }
 }

@@ -17,7 +17,7 @@ class Resume
     #[ORM\Column]
     private ?int $id = null;
 
-    #[ORM\OneToOne(inversedBy: 'resume', cascade: ['persist', 'remove'])]
+    #[ORM\OneToOne(inversedBy: 'resume', cascade: ['persist'])]
     #[ORM\JoinColumn(nullable: false)]
     private ?User $author = null;
 
@@ -39,7 +39,7 @@ class Resume
     #[ORM\Column(type: Types::TEXT, nullable: true)]
     private ?string $certifications = null;
 
-    #[ORM\OneToMany(mappedBy: 'resume', targetEntity: Job::class)]
+    #[ORM\ManyToMany(targetEntity: Job::class, inversedBy: 'resumes')]
     private Collection $jobs;
 
     public function __construct()
@@ -144,32 +144,11 @@ class Resume
         return $this->jobs;
     }
 
-    public function addJob(Job $job): self
-    {
-        if (!$this->jobs->contains($job)) {
-            $this->jobs->add($job);
-            $job->setResume($this);
-        }
-
-        return $this;
-    }
-
-    public function removeJob(Job $job): self
-    {
-        if ($this->jobs->removeElement($job)) {
-            // set the owning side to null (unless already changed)
-            if ($job->getResume() === $this) {
-                $job->setResume(null);
-            }
-        }
-
-        return $this;
-    }
-
   public function toArray()
   {
     return [
       'id' => $this->getId(),
+      'author' => $this->getAuthor()->toArray(),
       'summary' => $this->getSummary(),
       'phone' => $this->getPhone(),
       'education' => $this->getEducation(),
@@ -177,5 +156,21 @@ class Resume
       'experience' => $this->getExperience(),
       'certifications' => $this->getCertifications(),
     ];
+  }
+
+  public function addJob(Job $job): self
+  {
+      if (!$this->jobs->contains($job)) {
+          $this->jobs->add($job);
+      }
+
+      return $this;
+  }
+
+  public function removeJob(Job $job): self
+  {
+      $this->jobs->removeElement($job);
+
+      return $this;
   }
 }

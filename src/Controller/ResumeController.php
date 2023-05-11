@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\Resume;
 use App\Entity\User;
+use App\Repository\JobRepository;
 use App\Repository\ResumeRepository;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -11,21 +12,24 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
 
-#[Route('/api/seeker/resume')]
+#[Route('/api/resume')]
 class ResumeController extends AbstractController
 {
-    private User $currentUser;
+    private User|null $currentUser;
 
     private ResumeRepository $resumeRepository;
 
+    private JobRepository $jobRepository;
 
-    public function __construct(TokenStorageInterface $tokenStorage, ResumeRepository $resumeRepository) {
-        $this->currentUser = $tokenStorage->getToken()->getUser();
+
+    public function __construct(TokenStorageInterface $tokenStorage, ResumeRepository $resumeRepository, JobRepository $jobRepository) {
+        $this->currentUser = $tokenStorage->getToken()?->getUser();
         $this->resumeRepository = $resumeRepository;
+        $this->jobRepository = $jobRepository;
     }
 
 
-    #[Route('/add', name: 'app_resume_add')]
+    #[Route('/seeker/add', name: 'app_resume_add')]
     public function add(Request $request): Response
     {
       $hasAccess = $this->isGranted('ROLE_JOB_SEEKER');
@@ -46,7 +50,7 @@ class ResumeController extends AbstractController
       return $this->json(["message" => "Access denied."], Response::HTTP_FORBIDDEN);
     }
 
-    #[Route('/delete/{id}', name: 'app_resume_delete')]
+    #[Route('/seeker/delete/{id}', name: 'app_resume_delete')]
     public function delete(int $id) {
       $hasAccess = $this->isGranted('ROLE_JOB_SEEKER');
       $resume = $this->resumeRepository->find($id);
@@ -55,13 +59,13 @@ class ResumeController extends AbstractController
           return $this->json(["message" => "You not author this resume."], Response::HTTP_FORBIDDEN);
       }
       if ($hasAccess) {
-          $this->resumeRepository->remove($resume);
+          $this->resumeRepository->remove($resume, true);
           return $this->json(["message" => "Delete successfully."], Response::HTTP_OK);
       }
       return $this->json(["message" => "Access denied."], Response::HTTP_FORBIDDEN);
     }
 
-    #[Route('/update/{id}', name: 'app_resume_update')]
+    #[Route('/seeker/update/{id}', name: 'app_resume_update')]
     public function update(Request $request, int $id) {
         $hasAccess = $this->isGranted('ROLE_JOB_SEEKER');
         $resume = $this->resumeRepository->find($id);
@@ -98,10 +102,18 @@ class ResumeController extends AbstractController
         return $this->json(["message" => "Access denied."], Response::HTTP_FORBIDDEN);
     }
 
-    #[Route('/view/{id}', name: 'app_resume_view')]
-    public function view(int $id) {
-        $hasAccess = $this->isGranted('ROLE_JOB_SEEKER');
+    #[Route('/view/{id}', name: 'app_resume_view', methods: ['GET'])]
+    public function view(int $id, Request $request) {
         $resume = $this->resumeRepository->find($id);
+        $jobs = $resume->getJobs();
+        $resume_res = $resume->toArray();
+        $resume_res['author']['picture'] = $resume_res['author']['picture'] ? $request->getSchemeAndHttpHost() . $resume_res['author']['picture'] : null;
+        foreach ($jobs as $job) {
+            if ($job->getAuthor()->getId() == $this->currentUser->getId()) {
+                return $this->json(["resume" => $resume_res], Response::HTTP_OK);
+            }
+        }
+        $hasAccess = $this->isGranted('ROLE_JOB_SEEKER');
         if (is_null($resume)) {
             return $this->json(["message" => "Resume not found."], Response::HTTP_NOT_FOUND);
         }
@@ -110,9 +122,46 @@ class ResumeController extends AbstractController
             return $this->json(["message" => "You not author this resume."], Response::HTTP_FORBIDDEN);
         }
         if ($hasAccess) {
-            return $this->json(["resume" => $resume->toArray()], Response::HTTP_OK);
+            return $this->json(["resume" => $resume_res], Response::HTTP_OK);
         }
         return $this->json(["message" => "Access denied."], Response::HTTP_FORBIDDEN);
+    }
+
+    #[Route('/send/{recipient_id}', name: 'app_resume_send')]
+    public function sendResume(int $recipient_id) {
+        $resume = $this->resumeRepository->findBy(['author' => $this->currentUser]);
+        $job = $this->jobRepository->find($recipient_id);
+        $resume = reset($resume);
+        $resume->addJob($job);
+        $this->resumeRepository->save($resume, true);
+        $this->jobRepository->save($job, true);
+        return $this->json(["message" => $resume->toArray()], Response::HTTP_OK);
+    }
+
+    #[Route('/attach/{job_id}/check')]
+    public function checkAttachResume(int $job_id) {
+        $resume = $this->resumeRepository->findBy(['author' => $this->currentUser]);
+        if (empty($resume)) {
+            return $this->json(['check' => false]);
+        }
+        $resume = reset($resume);
+        $resume_jobs = $resume->getJobs();
+        foreach ($resume_jobs as $resume_job) {
+            if ($resume_job->getId() == $job_id) {
+                return $this->json(['check' => true]);
+            }
+        }
+        return $this->json(['check' => false]);
+    }
+
+    #[Route('/get/job_seeker')]
+    public function getResumeForUser() {
+        $resumes_res = [];
+        $resumes = $this->resumeRepository->findBy(['author' => $this->currentUser]);
+        foreach ($resumes as $resume) {
+            $resumes_res[] = $resume->toArray();
+        }
+        return $this->json($resumes_res);
     }
 
     public function getResumeDecodedData(Request $request): array {
@@ -131,10 +180,5 @@ class ResumeController extends AbstractController
             'skills' => $skills,
             'certifications' => $certifications,
         ];
-    }
-
-    #[Route('/send/{id}/{recipient_id}', name: 'app_resume_view')]
-    public function sendResume(int $id, int $recipient_id) {
-        
     }
 }

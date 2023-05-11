@@ -37,7 +37,8 @@ security:
     access_control:
         - { path: ^/api/register, roles: PUBLIC_ACCESS }
         - { path: ^/api/login, roles: PUBLIC_ACCESS }
-        - { path: ^/api,       roles: IS_AUTHENTICATED_FULLY }
         - { path: ^/api/recruiter, roles: ROLE_RECRUITER }
         - { path: ^/api/seeker, roles: ROLE_JOB_SEEKER }
         - { path: ^/api/admin, roles: ROLE_ADMIN}
+        - { path: ^/api/jobs, roles: PUBLIC_ACCESS }
+        - { path: ^/api/job/*, roles: PUBLIC_ACCESS }
